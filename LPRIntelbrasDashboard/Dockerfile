@@ -4,9 +4,10 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 # Define o diretório de trabalho dentro do contêiner
 WORKDIR /src
 
-# Copia o arquivo de solução e restaura as dependências
-COPY LPRIntelbrasDashboard.sln ./
-COPY LPRIntelbrasDashboard/LPRIntelbrasDashboard.csproj LPRIntelbrasDashboard/
+# Copia o arquivo de solução que está no diretório anterior
+COPY ../LPRIntelbrasDashboard.sln ./
+COPY ../LPRIntelbrasDashboard/LPRIntelbrasDashboard.csproj LPRIntelbrasDashboard/
+
 RUN dotnet restore LPRIntelbrasDashboard/LPRIntelbrasDashboard.csproj
 
 # Copia o código-fonte e compila
