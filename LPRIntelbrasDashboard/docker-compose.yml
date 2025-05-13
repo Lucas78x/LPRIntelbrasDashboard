@@ -16,16 +16,16 @@ services:
 
   mvc_app:
     build:
-      context: ./LPRIntelbrasDashboard  # Caminho relativo para onde está o arquivo .sln
-      dockerfile: Dockerfile  # Dockerfile está no diretório atual ou defina caminho
+      context: ./LPRIntelbrasDashboard
+      dockerfile: Dockerfile
     container_name: usuario_mvc
     restart: always
     environment:
-      ASPNETCORE_ENVIRONMENT: "Production"  # Ajuste conforme necessário
+      ASPNETCORE_ENVIRONMENT: "Production"
     ports:
-      - "7195:80"   # HTTP
-      - "7196:443"  # HTTPS
+      - "7195:80"
+      - "7196:443"
     volumes:
-      - ./LPRIntelbrasDashboard/LPRIntelbrasDashboard:/app  # Mapeando a pasta onde o .csproj está para /app no container
+      - ./LPRIntelbrasDashboard/LPRIntelbrasDashboard:/app
     depends_on:
       - usuario_postgres
