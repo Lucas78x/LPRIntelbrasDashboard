@@ -1,30 +1,28 @@
-# Etapa base
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
-# Etapa de build
+# Use a imagem base do .NET SDK 8.0 para compilar o projeto
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG BUILD_CONFIGURATION=Release
+
 WORKDIR /src
 
-# Copiar o csproj e restaurar as dependências
+# Copia o arquivo de solução e restaura as dependências
+COPY ["LPRIntelbrasDashboard.sln", "./"]
 COPY ["LPRIntelbrasDashboard/LPRIntelbrasDashboard.csproj", "LPRIntelbrasDashboard/"]
 RUN dotnet restore "LPRIntelbrasDashboard/LPRIntelbrasDashboard.csproj"
 
-# Copiar todo o código
+# Copia o código-fonte e compila
 COPY . .
 WORKDIR "/src/LPRIntelbrasDashboard"
-RUN dotnet build "LPRIntelbrasDashboard.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "LPRIntelbrasDashboard.csproj" -c Release -o /app/build
 
-# Etapa de publicação
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "LPRIntelbrasDashboard.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+# Publica a aplicação para a pasta /app/publish
+RUN dotnet publish "LPRIntelbrasDashboard.csproj" -c Release -o /app/publish
 
-# Etapa final
-FROM base AS final
+# Define a imagem de produção para a execução com .NET 8.0
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
-COPY --from=publish /app/publish .
+EXPOSE 80
+EXPOSE 443
+
+# Copia os arquivos compilados do build
+COPY --from=build /app/publish .
+
 ENTRYPOINT ["dotnet", "LPRIntelbrasDashboard.dll"]

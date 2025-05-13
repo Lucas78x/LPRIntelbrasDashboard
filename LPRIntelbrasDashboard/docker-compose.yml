@@ -1,8 +1,8 @@
-version: "3.9"  
+version: "3.9"
 services:
   usuario_postgres:
-    image: postgres:15-alpine  # <-- Imagem que funcionou
-    platform: linux/amd64      # <-- Garante arquitetura correta
+    image: postgres:15-alpine
+    platform: linux/amd64
     container_name: usuario_postgres
     restart: always
     environment:
@@ -12,4 +12,20 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./pgdata:/var/lib/postgresql/data  
+      - ./pgdata:/var/lib/postgresql/data:rw
+
+  mvc_app:
+    build:
+      context: ./LPRIntelbrasDashboard  # Caminho relativo para onde está o arquivo .sln
+      dockerfile: Dockerfile  # Dockerfile está no diretório atual ou defina caminho
+    container_name: usuario_mvc
+    restart: always
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"  # Ajuste conforme necessário
+    ports:
+      - "7195:80"   # HTTP
+      - "7196:443"  # HTTPS
+    volumes:
+      - ./LPRIntelbrasDashboard/LPRIntelbrasDashboard:/app  # Mapeando a pasta onde o .csproj está para /app no container
+    depends_on:
+      - usuario_postgres
