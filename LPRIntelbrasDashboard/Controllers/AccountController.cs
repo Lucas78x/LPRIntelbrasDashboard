@@ -42,7 +42,7 @@ public class AccountController : Controller
             var client = new HttpClient(handler);
 
             var content = new StringContent(JsonSerializer.Serialize(login), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("https://172.30.2.163:7195/api/v1/auth/login", content);
+            var response = await client.PostAsync("https://45.187.55.245:7195/api/v1/auth/login", content);
 
             if (response.IsSuccessStatusCode)
             {
@@ -95,7 +95,7 @@ public class AccountController : Controller
             };
 
             var client = new HttpClient(handler);
-            var response = await client.PostAsync("https://172.30.2.163:7195/api/v1/auth/revoke-token", null);
+            var response = await client.PostAsync("https://45.187.55.245:7195/api/v1/auth/revoke-token", null);
         }
     }
 }
