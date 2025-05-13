@@ -1,6 +1,7 @@
 # Use a imagem base do .NET SDK 8.0 para compilar o projeto
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
+# Define o diretório de trabalho dentro do contêiner
 WORKDIR /src
 
 # Copia o arquivo de solução e restaura as dependências
@@ -25,4 +26,5 @@ EXPOSE 443
 # Copia os arquivos compilados do build
 COPY --from=build /app/publish .
 
+# Define o comando para rodar a aplicação
 ENTRYPOINT ["dotnet", "LPRIntelbrasDashboard.dll"]
