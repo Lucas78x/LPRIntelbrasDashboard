@@ -49,7 +49,7 @@ public class AuthController : ControllerBase
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var userCreate = new UsuarioDTO { Nome = "Lucas",UserName = "Lucas", Email = request.Email };
+            var userCreate = new UsuarioDTO { Nome = "Flavio",UserName = "Flavio", Email = request.Email };
             var result = await _userManager.CreateAsync(userCreate, request.Password);
             // Busca o usuário pelo email
             var user = await _userManager.FindByEmailAsync(request.Email);
