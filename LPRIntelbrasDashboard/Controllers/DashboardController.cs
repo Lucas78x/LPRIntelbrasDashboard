@@ -13,7 +13,7 @@ namespace LPRIntelbrasDashboard.Controllers
     {
         private readonly IHubContext<LPRHub> _hubContext;
         string basePath = AppContext.BaseDirectory;
-        _dataFile = Path.Combine(basePath, "Data", "MergedData.csv");
+        private readonly string _dataFile = Path.Combine(AppContext.BaseDirectory, "Data", "MergedData.csv");
 
         public DashboardController(IHubContext<LPRHub> hubContext)
         {
