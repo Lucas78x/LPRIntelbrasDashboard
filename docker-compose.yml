@@ -17,7 +17,7 @@ services:
   mvc_app:
     build:
       context: ./  
-      dockerfile: LPRIntelbrasDashboard/Dockerfile  
+      dockerfile: Dockerfile  
     container_name: usuario_mvc
     restart: always
     environment:
