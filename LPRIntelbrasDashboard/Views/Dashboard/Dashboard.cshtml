@@ -15,14 +15,14 @@
         : Model.Registros.Where(r => r.Região?.ToLower() == Model.Regiao.ToLower()).ToList();
 
     // Convertendo DataHora para DateTime para fazer agrupamentos
-    var registrosConvertidos = registrosFiltrados
-        .Select(r => new
-        {
-            Data = DateTime.TryParse(r.DataHora, out var dt) ? dt : (DateTime?)null,
-            Regiao = r.Região
-        })
-        .Where(r => r.Data != null)
-        .ToList();
+   var registrosConvertidos = registrosFiltrados
+    .Select(r => new
+    {
+        Data = DateTime.TryParseExact(r.DataHora, "dd/MM/yyyy HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out var dt) ? dt : (DateTime?)null,
+        Regiao = r.Região
+    })
+    .Where(r => r.Data != null)
+    .ToList();
 
     // Agrupando por dia
     var placasPorDia = registrosConvertidos
