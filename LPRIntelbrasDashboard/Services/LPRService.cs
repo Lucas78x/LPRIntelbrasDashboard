@@ -27,7 +27,7 @@ namespace LPRIntelbrasDashboard.Services
         {
             try
             {
-                string filename = $"Veic_Flux_{DateTime.Now:dd_MM_yyyy_HH_mm_ss}";
+                string filename = $"Veic_Flux_{DateTime.UtcNow:dd_MM_yyyy_HH_mm_ss}";
                 long unixStartTime = new DateTimeOffset(DateTime.UtcNow.AddDays(-2)).ToUnixTimeSeconds();
                 long unixEndTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 string password = "152535ff", username = "admin";

@@ -70,10 +70,11 @@ namespace LPRIntelbrasDashboard.Controllers
             if (!string.IsNullOrEmpty(data))
                 registros = registros.Where(r => r.DataHora.StartsWith(data)).ToList();
 
+            string formato = "dd/MM/yyyy HH:mm"; // Defina o formato da data e hora
             registros = registros
-           .Where(r => DateTime.TryParse(r.DataHora, out _))
-           .OrderByDescending(r => DateTime.Parse(r.DataHora))
-           .ToList();
+                .Where(r => DateTime.TryParseExact(r.DataHora, formato, null, System.Globalization.DateTimeStyles.None, out _))
+                .OrderByDescending(r => DateTime.ParseExact(r.DataHora, formato, null))
+                .ToList();
 
             var model = new DashboardViewModel
             {
