@@ -1,0 +1,70 @@
+﻿:root {
+    --sidebar-bg: linear-gradient(180deg, #1f1f2e, #2b2b3c);
+    --sidebar-color: #adb5bd;
+    --sidebar-active-bg: #343a40;
+    --accent: #0d6efd;
+}
+
+body {
+    background-color: #f1f3f5;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 250px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-color);
+    padding-top: 70px;
+    z-index: 1000;
+}
+
+    .sidebar .nav-link {
+        color: var(--sidebar-color);
+        padding: 15px 20px;
+        font-size: 1rem;
+        transition: all 0.2s;
+    }
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background-color: var(--sidebar-active-bg);
+            color: #fff;
+            border-left: 4px solid var(--accent);
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 10px;
+        }
+
+.navbar {
+    margin-left: 250px;
+    background-color: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    z-index: 1001;
+}
+
+.navbar-brand {
+    color: #0d6efd !important;
+    font-weight: bold;
+}
+
+.content {
+    margin-left: 250px;
+    margin-top: 70px;
+    padding: 30px;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+
+    .navbar, .content {
+        margin-left: 0;
+    }
+}

@@ -1,0 +1,459 @@
+﻿@model LPRIntelbrasDashboard.Models.DashboardViewModel
+@using Newtonsoft.Json
+@{
+    ViewData["Title"] = "Dashboard - F&F Security";
+
+    var totalRegistros = Model.Registros.Count();
+
+    var totalRegiao = !string.IsNullOrEmpty(Model.Regiao)
+        ? Model.Registros.Count(r => r.Região?.ToLower() == Model.Regiao.ToLower())
+        : totalRegistros;
+
+    // Filtrando por região, se necessário
+    var registrosFiltrados = string.IsNullOrEmpty(Model.Regiao) || Model.Regiao.ToLower() == "Todos"
+        ? Model.Registros
+        : Model.Registros.Where(r => r.Região?.ToLower() == Model.Regiao.ToLower()).ToList();
+
+    // Convertendo DataHora para DateTime para fazer agrupamentos
+    var registrosConvertidos = registrosFiltrados
+        .Select(r => new
+        {
+            Data = DateTime.TryParse(r.DataHora, out var dt) ? dt : (DateTime?)null,
+            Regiao = r.Região
+        })
+        .Where(r => r.Data != null)
+        .ToList();
+
+    // Agrupando por dia
+    var placasPorDia = registrosConvertidos
+      .GroupBy(r => r.Data.Value.Date)
+      .Select(g => new { Dia = g.Key.ToString("yyyy-MM-dd"), Total = g.Count() })
+      .OrderBy(x => x.Dia)
+      .ToList();
+
+    // Agrupando por semana
+    var placasPorSemana = registrosConvertidos
+        .GroupBy(r => System.Globalization.CultureInfo.CurrentCulture.Calendar.GetWeekOfYear(
+            r.Data.Value, System.Globalization.CalendarWeekRule.FirstDay, DayOfWeek.Monday))
+        .Select(g => new { Semana = $"Semana {g.Key}", Total = g.Count() })
+        .ToList();
+
+    // Agrupando por mês
+    var placasPorMes = registrosConvertidos
+        .GroupBy(r => r.Data.Value.ToString("yyyy-MM"))
+        .Select(g => new { Mes = g.Key, Total = g.Count() })
+        .OrderBy(x => x.Mes)
+        .ToList();
+
+    ViewBag.PlacasPorDia = placasPorDia;
+    ViewBag.PlacasPorSemana = placasPorSemana;
+    ViewBag.PlacasPorMes = placasPorMes;
+}
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <!-- Fonts, Bootstrap, FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+
+    <!-- jQuery deve vir primeiro, pois DataTables depende dele -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.7/signalr.min.js"></script>
+    <!-- DataTables, que depende do jQuery -->
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+
+    <!-- Chart.js não depende de nada -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- particles.js pode ser carregado por último, sem dependências -->
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Roboto', sans-serif;
+            background: #f4f7fa;
+        }
+
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            top: 0;
+            left: 0;
+        }
+
+        .dashboard-container {
+            margin: 60px auto;
+            width: 90%;
+            max-width: 1200px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        h1 {
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 30px;
+            color: #0d6efd;
+        }
+
+        .search-bar input, .search-bar select, .search-bar button {
+            border-radius: 10px;
+        }
+
+        /* Cards para resumo de registros */
+        .stats-summary {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .stats-card {
+            background: #0d6efd;
+            color: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+            min-width: 240px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+            .stats-card:hover {
+                transform: scale(1.05);
+            }
+
+            .stats-card h4 {
+                font-size: 1.1rem;
+                font-weight: 500;
+            }
+
+            .stats-card p {
+                font-size: 2.2rem;
+                font-weight: 700;
+            }
+
+        /* Estilo refinado para a tabela */
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 12px;
+        }
+
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        table.table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            font-size: 0.95rem;
+        }
+
+            table.table thead {
+                background-color: #0d6efd;
+                color: #fff;
+            }
+
+                table.table thead th {
+                    padding: 15px;
+                    text-align: left;
+                    font-weight: 600;
+                    border: none;
+                }
+
+            table.table tbody tr {
+                transition: background 0.25s ease;
+            }
+
+                table.table tbody tr:hover {
+                    background-color: #eef4ff;
+                    cursor: pointer;
+                }
+
+            table.table td {
+                padding: 14px 16px;
+                border-top: 1px solid #e9ecef;
+                vertical-align: middle;
+                color: #333;
+            }
+
+            table.table tbody tr:nth-child(even) {
+                background-color: #f9fbff;
+            }
+
+            table.table td i {
+                margin-right: 5px;
+                color: #0d6efd;
+            }
+
+        .footer-text {
+            margin-top: 30px;
+            font-size: 13px;
+            text-align: center;
+            color: #666;
+        }
+
+        /* Estilo para o filtro */
+        .filter-container {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+            .filter-container select, .filter-container button {
+                margin-right: 10px;
+                border-radius: 8px;
+                padding: 8px 15px;
+                border: 1px solid #ddd;
+            }
+
+            .filter-container button {
+                background-color: #0d6efd;
+                color: white;
+            }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+
+    <div class="dashboard-container">
+        <h1>F&F Security - Registros de Placas</h1>
+
+        <!-- Filtro com opções -->
+        <div class="container my-4 p-3 bg-light rounded shadow-sm">
+            <form method="get" class="d-flex align-items-center gap-2">
+                <i class="fas fa-map-marker-alt fa-lg text-primary"></i>
+                <select class="form-select w-auto" name="regiao">
+                    <option value="Todos" selected>🌍 Todos</option>
+                    @foreach (var regiao in Model.Regioes.Distinct())
+                    {
+                        <option value="@regiao" selected="@(Model.Regiao == regiao ? "selected" : null)">
+                            @regiao
+                        </option>
+                    }
+                </select>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+            </form>
+        </div>
+
+        <!-- Cards de resumo -->
+        <div class="stats-summary">
+            <div class="stats-card">
+                <h4><i class="fas fa-clipboard-list"></i> Total de Registros</h4>
+                <p>@totalRegistros</p>
+            </div>
+            <div class="stats-card">
+                <h4><i class="fas fa-map-marker-alt"></i> Filtrados por Região</h4>
+                <p>@totalRegiao</p>
+            </div>
+        </div>
+
+        <div class="row my-4">
+            <div class="col-md-4">
+                <canvas id="chartPorDia"></canvas>
+            </div>
+            <div class="col-md-4">
+                <canvas id="chartPorSemana"></canvas>
+            </div>
+            <div class="col-md-4">
+                <canvas id="chartPorMes"></canvas>
+            </div>
+        </div>
+
+        <div class="row my-4" id="chartRegioesContainer" style="display: @(Model.Regiao?.ToLower() == "Todos" || string.IsNullOrEmpty(Model.Regiao) ? "block" : "none")">
+            <div class="col-md-12">
+                <canvas id="chartPorRegiao"></canvas>
+            </div>
+        </div>
+
+        <!-- Tabela de Registros -->
+        <div class="table-container">
+            <table id="registrosTable" class="table table-hover table-bordered">
+                <thead>
+                    <tr>
+                        <th><i class="fas fa-car-side"></i> Placa</th>
+                        <th><i class="fas fa-calendar-alt"></i> Data e Hora</th>
+                        <th><i class="fas fa-map-marker-alt"></i> Região</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var registro in Model.Registros)
+                    {
+                        <tr>
+                            <td><i class="fas fa-car"></i> @registro.NPlaca</td>
+                            <td data-order="@(((DateTime)Convert.ToDateTime(registro.DataHora)).ToString("yyyy-MM-dd HH:mm:ss"))">
+                                <i class="fas fa-clock"></i> @Convert.ToDateTime(registro.DataHora).ToString("dd/MM/yyyy HH:mm")
+                            </td>
+                            <td><i class="fas fa-map-pin"></i> @registro.Região</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Rodapé -->
+        <div class="footer-text">
+            &copy; @DateTime.Now.Year F&F Security - Todos os direitos reservados.
+        </div>
+    </div>
+
+    <script>
+        const porDia = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(placasPorDia));
+        const porSemana = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(placasPorSemana));
+        const porMes = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(placasPorMes));
+        console.log("porDia",porDia);
+        console.log("porSemana",porSemana);
+
+        function renderChart(ctx, labels, data, label, bgColor = '#0d6efd') {
+            return new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        backgroundColor: bgColor,
+                        borderRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderPieChart(ctx, labels, data) {
+            return new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#0d6efd', '#6c757d', '#ffc107', '#198754', '#dc3545']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        // Render charts
+        renderChart(document.getElementById('chartPorDia'), porDia.map(x => x.Dia), porDia.map(x => x.Total), 'Por Dia');
+        renderChart(document.getElementById('chartPorSemana'), porSemana.map(x => x.Semana), porSemana.map(x => x.Total), 'Por Semana');
+        renderChart(document.getElementById('chartPorMes'), porMes.map(x => x.Mes), porMes.map(x => x.Total), 'Por Mês');
+    </script>
+
+    <!-- Particles.js -->
+    <script>
+                $(document).ready(function () {
+            $('#registrosTable').DataTable({
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/pt-BR.json'
+                },
+                pageLength: 10,
+                responsive: true,
+                order: [[1, 'desc']] // ordena pela 2ª coluna (Data e Hora), decrescente
+            });
+        });
+
+        particlesJS("particles-js", {
+            "particles": {
+                "number": {
+                    "value": 60,
+                    "density": { "enable": true, "value_area": 800 }
+                },
+                "color": { "value": "#0d6efd" },
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.2, "random": true },
+                "size": { "value": 4, "random": true },
+                "line_linked": {
+                    "enable": true,
+                    "distance": 150,
+                    "color": "#0d6efd",
+                    "opacity": 0.3,
+                    "width": 1
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 2,
+                    "direction": "none",
+                    "out_mode": "out"
+                }
+            },
+            "interactivity": {
+                "detect_on": "canvas",
+                "events": {
+                    "onhover": { "enable": true, "mode": "grab" },
+                    "onclick": { "enable": false }
+                },
+                "modes": {
+                    "grab": { "distance": 140, "line_linked": { "opacity": 0.4 } }
+                }
+            },
+            "retina_detect": true
+        });
+            const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/LPRHub")
+            .build();
+
+        connection.on("ReceiveMessage", function (message) {
+            document.getElementById("content").innerHTML = "Página atualizada às " + message;
+        });
+
+        connection.start().catch(function (err) {
+            return console.error(err.toString());
+        });
+
+        document.getElementById("updateButton").addEventListener("click", function () {
+            connection.invoke("SendMessage", new Date().toLocaleTimeString())
+                .catch(function (err) {
+                    return console.error(err.toString());
+                });
+        });
+
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+

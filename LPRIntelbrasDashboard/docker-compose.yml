@@ -1,0 +1,15 @@
+version: "3.9"  
+services:
+  usuario_postgres:
+    image: postgres:15-alpine  # <-- Imagem que funcionou
+    platform: linux/amd64      # <-- Garante arquitetura correta
+    container_name: usuario_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: usuariosdb
+      POSTGRES_USER: lpr2025
+      POSTGRES_PASSWORD: devpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data  
