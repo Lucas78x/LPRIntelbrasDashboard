@@ -16,8 +16,8 @@ services:
 
   mvc_app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./  
+      dockerfile: LPRIntelbrasDashboard/Dockerfile  
     container_name: usuario_mvc
     restart: always
     environment:
@@ -26,6 +26,6 @@ services:
       - "7195:80"
       - "7196:443"
     volumes:
-      - ./LPRIntelbrasDashboard:/app
+      - ./LPRIntelbrasDashboard:/app  
     depends_on:
       - usuario_postgres
