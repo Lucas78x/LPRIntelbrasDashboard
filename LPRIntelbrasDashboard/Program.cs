@@ -87,13 +87,7 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
-string timeZoneId = Environment.OSVersion.Platform == PlatformID.Unix ? "America/Sao_Paulo" : "E. South America Standard Time";
-TimeZoneInfo brazilTimeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-app.Use(async (context, next) =>
-{
-    DateTime brazilTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, brazilTimeZone);
-    await next.Invoke();
-});
+
 app.UseSession();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
