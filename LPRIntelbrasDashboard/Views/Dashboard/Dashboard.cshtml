@@ -309,8 +309,8 @@
                     {
                         <tr>
                             <td><i class="fas fa-car"></i> @registro.NPlaca</td>
-                            <td data-order="@(((DateTime)Convert.ToDateTime(registro.DataHora)).ToString("yyyy-MM-dd HH:mm:ss"))">
-                                <i class="fas fa-clock"></i> @Convert.ToDateTime(registro.DataHora).ToString("dd/MM/yyyy HH:mm")
+                            <td data-order="@((DateTime.Parse(registro.DataHora).ToUniversalTime()).ToString("yyyy-MM-dd HH:mm:ss"))">
+                            <i class="fas fa-clock"></i> @(DateTime.Parse(registro.DataHora).ToUniversalTime().ToString("dd/MM/yyyy HH:mm"))
                             </td>
                             <td><i class="fas fa-map-pin"></i> @registro.Região</td>
                         </tr>
