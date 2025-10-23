@@ -3,43 +3,59 @@ using Microsoft.AspNetCore.SignalR;
 using CsvHelper;
 using System.Globalization;
 using System.Text;
-using LPRIntelbrasDashboard.Models;
-using System.Linq;
 using System.IdentityModel.Tokens.Jwt;
+using LPRIntelbrasDashboard.Models;
+using Microsoft.Extensions.Logging;
 
 namespace LPRIntelbrasDashboard.Controllers
 {
     public class DashboardController : Controller
     {
         private readonly IHubContext<LPRHub> _hubContext;
-        private readonly string _dataFile = Path.Combine(Directory.GetCurrentDirectory(), "Data", "MergedData.csv");
+        private readonly ILogger<DashboardController> _logger;
+        private readonly string _dataFile;
 
-        public DashboardController(IHubContext<LPRHub> hubContext)
+        public DashboardController(IHubContext<LPRHub> hubContext, ILogger<DashboardController> logger)
         {
             _hubContext = hubContext;
+            _logger = logger;
+            _dataFile = Path.Combine(Directory.GetCurrentDirectory(), "Data", "MergedData.csv");
         }
 
+        /// <summary>
+        /// Exibe o painel principal com filtros aplicáveis.
+        /// </summary>
         public IActionResult Dashboard(string filtroPlaca = "", string regiao = "", string data = "")
         {
             if (!ValidateToken())
             {
-                RemoveSession();
+                _logger.LogWarning("Sessão inválida ou token expirado. Redirecionando para login.");
+                ClearSession();
                 return RedirectToAction("Login", "Account");
             }
 
-            List<RegistroCSV> registros = RegistrosByCSV();
+            try
+            {
+                var registros = LoadRegistrosFromCsv();
+                var model = BuildDashboardViewModel(filtroPlaca, regiao, data, registros);
 
-            DashboardViewModel model = CreateDashboardModel(filtroPlaca, regiao, data, ref registros);
-
-            return View(model);
+                _logger.LogInformation("Total de registros carregados: {count}", model.TotalPlacas);
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao carregar registros ou montar o dashboard.");
+                return View("Error", ex);
+            }
         }
 
-
+        /// <summary>
+        /// Valida o token JWT armazenado na sessão.
+        /// </summary>
         private bool ValidateToken()
         {
             var token = HttpContext.Session.GetString("Token");
-
-            if (string.IsNullOrEmpty(token))
+            if (string.IsNullOrWhiteSpace(token))
                 return false;
 
             var handler = new JwtSecurityTokenHandler();
@@ -47,62 +63,85 @@ namespace LPRIntelbrasDashboard.Controllers
             try
             {
                 var jwtToken = handler.ReadJwtToken(token);
-                var expiration = jwtToken.ValidTo;
-                if (expiration < DateTime.UtcNow)
-                    return false;
-
-                return true;
+                return jwtToken.ValidTo > DateTime.UtcNow;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogWarning(ex, "Falha ao validar token JWT.");
                 return false;
             }
         }
 
-        private static DashboardViewModel CreateDashboardModel(string filtroPlaca, string regiao, string data, ref List<RegistroCSV> registros)
+        /// <summary>
+        /// Constrói o modelo de visualização do Dashboard aplicando filtros.
+        /// </summary>
+        private static DashboardViewModel BuildDashboardViewModel(string filtroPlaca, string regiao, string data, List<RegistroCSV> registros)
         {
-            if (!string.IsNullOrEmpty(filtroPlaca))
-                registros = registros.Where(r => r.NPlaca.Contains(filtroPlaca, StringComparison.OrdinalIgnoreCase)).ToList();
+            IEnumerable<RegistroCSV> query = registros;
 
-            if (!string.IsNullOrEmpty(regiao) && regiao != "Todos")
-                registros = registros.Where(r => r.Região == regiao).ToList();
+            if (!string.IsNullOrEmpty(filtroPlaca))
+                query = query.Where(r => r.NPlaca.Contains(filtroPlaca, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrEmpty(regiao) && !regiao.Equals("Todos", StringComparison.OrdinalIgnoreCase))
+                query = query.Where(r => r.Região.Equals(regiao, StringComparison.OrdinalIgnoreCase));
 
             if (!string.IsNullOrEmpty(data))
-                registros = registros.Where(r => r.DataHora.StartsWith(data)).ToList();
+                query = query.Where(r => r.DataHora.StartsWith(data));
 
-            registros = registros
-           .Where(r => DateTime.TryParse(r.DataHora, out _))
-           .OrderByDescending(r => DateTime.Parse(r.DataHora))
-           .ToList();
-            var model = new DashboardViewModel
+            // Garante ordenação e filtragem apenas de datas válidas
+            var registrosFiltrados = query
+                .Where(r => DateTime.TryParse(r.DataHora, out _))
+                .OrderByDescending(r => DateTime.Parse(r.DataHora))
+                .ToList();
+
+            return new DashboardViewModel
             {
-                Registros = registros,
+                Registros = registrosFiltrados,
                 FiltroPlaca = filtroPlaca,
                 Regiao = regiao,
                 Data = data
             };
-            return model;
         }
 
-        private List<RegistroCSV> RegistrosByCSV()
+        /// <summary>
+        /// Carrega os registros do CSV de forma segura e robusta.
+        /// </summary>
+        private List<RegistroCSV> LoadRegistrosFromCsv()
         {
             var registros = new List<RegistroCSV>();
-            if (System.IO.File.Exists(_dataFile))
+
+            if (!System.IO.File.Exists(_dataFile))
+            {
+                _logger.LogWarning("Arquivo CSV não encontrado em {path}.", _dataFile);
+                return registros;
+            }
+
+            try
             {
                 using var reader = new StreamReader(_dataFile, new UTF8Encoding(true));
                 using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+
                 registros = csv.GetRecords<RegistroCSV>()
                     .Where(r => !string.IsNullOrWhiteSpace(r.NPlaca))
                     .ToList();
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao ler o arquivo CSV.");
+                throw;
+            }
 
             return registros;
         }
-        private void RemoveSession()
+
+        /// <summary>
+        /// Remove os dados da sessão de forma segura.
+        /// </summary>
+        private void ClearSession()
         {
             HttpContext.Session.Remove("Token");
             HttpContext.Session.Remove("User");
+            _logger.LogInformation("Sessão limpa com sucesso.");
         }
-
     }
 }
