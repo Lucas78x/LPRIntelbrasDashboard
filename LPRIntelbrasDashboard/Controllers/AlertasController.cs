@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using LPRIntelbrasDashboard.DTO;
+using LPRIntelbrasDashboard.Models;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
-
-using LPRIntelbrasDashboard.DTO;
 
 public class AlertasController : Controller
 {
@@ -44,8 +44,17 @@ public class AlertasController : Controller
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao carregar página de alertas.");
-            return View("Error", ex);
+
+            var errorModel = new ErrorViewModel
+            {
+                RequestId = HttpContext.TraceIdentifier,
+                Message = ex.Message,
+                StackTrace = ex.StackTrace
+            };
+
+            return View("Error", errorModel);
         }
+
     }
 
     /// <summary>
