@@ -21,7 +21,7 @@ public class AlertasController : Controller
         _hubContext = hubContext;
         _logger = logger;
         _httpClientFactory = httpClientFactory;
-        _apiBaseUrl = configuration["ApiBaseUrl"] ?? "https://45.187.55.245:7195/api/v1/alerta";
+        _apiBaseUrl = configuration["ApiBaseUrl"] ?? "http://45.187.55.245:7195/api/v1/alerta";
     }
 
     /// <summary>
@@ -62,7 +62,13 @@ public class AlertasController : Controller
     /// </summary>
     private async Task<List<Alerta>> ObterAlertasDoUsuario()
     {
-        var client = _httpClientFactory.CreateClient();
+        var handler = new HttpClientHandler()
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+
+        var client = new HttpClient(handler);
+
         var token = HttpContext.Session.GetString("Token");
 
         client.DefaultRequestHeaders.Authorization =
