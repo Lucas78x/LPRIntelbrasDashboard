@@ -73,7 +73,15 @@ builder.Services.AddSignalR();
 builder.Services.AddHangfire(config => config.UseMemoryStorage());
 builder.Services.AddHangfireServer();
 builder.Services.AddSession();
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("NoSSL")
+    .ConfigurePrimaryHttpMessageHandler(() =>
+    {
+        return new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+    });
 
 // Registrar serviços
 builder.Services.AddSingleton<ILPRService, LPRService>();
