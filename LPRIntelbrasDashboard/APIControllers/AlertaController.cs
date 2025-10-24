@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using LPRIntelbrasDashboard.DTO;
 using LPRIntelbrasDashboard.Models;
 using System.Security.Claims;
+using AutoMapper;
 
 
 [ApiController]
@@ -14,11 +15,13 @@ public class AlertaController : ControllerBase
 {
     private readonly UsuarioDbContext _context;
     private readonly ILogger<AlertasController> _logger;
+    private readonly IMapper _mapper;
 
-    public AlertaController(UsuarioDbContext context, ILogger<AlertasController> logger)
+    public AlertaController(UsuarioDbContext context, ILogger<AlertasController> logger, IMapper mapper)
     {
         _context = context;
         _logger = logger;
+        _mapper = mapper;
     }
 
     /// <summary>
@@ -27,7 +30,7 @@ public class AlertaController : ControllerBase
     [HttpPost("criar")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CriarAlerta([FromBody] Alerta alerta)
+    public async Task<IActionResult> CriarAlerta([FromBody] AlertaModel alerta)
     {
         try
         {
@@ -38,8 +41,11 @@ public class AlertaController : ControllerBase
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized("Usuário não autenticado");
 
-            alerta.UsuarioId = int.Parse(userId);
-            _context.Alertas.Add(alerta);
+            var alertaDto = _mapper.Map<Alerta>(alerta);
+
+            alertaDto.UsuarioId = int.Parse(userId);
+            _context.Alertas.Add(alertaDto);
+
             await _context.SaveChangesAsync();
 
             _logger.LogInformation($"Alerta criado: {alerta.Placa} por usuário {userId}");
@@ -62,10 +68,10 @@ public class AlertaController : ControllerBase
         try
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var alertas = await _context.Alertas
+            var alertas = _mapper.Map<AlertaModel>(await _context.Alertas
                 .Include(a => a.Usuario)
                 .Where(a => a.UsuarioId.ToString() == userId)
-                .ToListAsync();
+                .ToListAsync());
 
             return Ok(alertas);
         }
