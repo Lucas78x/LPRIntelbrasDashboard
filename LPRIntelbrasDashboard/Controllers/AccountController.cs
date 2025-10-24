@@ -1,13 +1,14 @@
-﻿using System.Net.Http;
+﻿using CsvHelper;
+using LPRIntelbrasDashboard.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
-using LPRIntelbrasDashboard.Models;
-using CsvHelper;
-using System.Globalization;
-using System.Net;
 
 public class AccountController : Controller
 {
@@ -22,11 +23,37 @@ public class AccountController : Controller
     public async Task<IActionResult> Login()
     {
         var token = HttpContext.Session.GetString("Token");
-        if (token != null)
+        if (token != null && !ValidateToken())
         {
+            RemoveSession();
             return RedirectToAction("Dashboard", "Dashboard");
         }
         return View();
+    }
+
+    private bool ValidateToken()
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        var handler = new JwtSecurityTokenHandler();
+
+        try
+        {
+            var jwtToken = handler.ReadJwtToken(token);
+            return jwtToken.ValidTo > DateTime.UtcNow;
+        }
+        catch (Exception ex)
+        {
+            return false;
+        }
+    }
+
+    private void ClearSession()
+    {
+        HttpContext.Session.Remove("Token");
+        HttpContext.Session.Remove("User");
     }
 
     [HttpPost]
