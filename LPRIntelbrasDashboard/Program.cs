@@ -16,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<UsuarioDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("PostgresConnection")));
-// Configuração JWT
+
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 
 builder.Services.AddAuthentication(options =>
@@ -78,6 +78,7 @@ builder.Services.AddHttpClient();
 // Registrar serviços
 builder.Services.AddSingleton<ILPRService, LPRService>();
 builder.Services.AddSingleton<ICSVService, CSVService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddAutoMapper(typeof(Program));
 
 var app = builder.Build();

@@ -1,18 +1,14 @@
-﻿using CsvHelper;
-using LPRIntelbrasDashboard.Models;
-using Microsoft.AspNetCore.Http;
+﻿using LPRIntelbrasDashboard.Models;
 using Microsoft.AspNetCore.Mvc;
-using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 public class AccountController : Controller
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private const string ApiBaseUrl = "https://45.187.55.245:7195/api/v1/auth";
 
     public AccountController(IHttpClientFactory httpClientFactory)
     {
@@ -22,107 +18,140 @@ public class AccountController : Controller
     [HttpGet]
     public async Task<IActionResult> Login()
     {
-        var token = HttpContext.Session.GetString("Token");
-        if (token != null && !ValidateToken())
-        {
-            RemoveSession();
+        // se já tem sessão válida -> manda direto pro dashboard
+        if (await HasValidOrRefreshedTokenAsync())
             return RedirectToAction("Dashboard", "Dashboard");
-        }
+
+        // senão mostra tela de login
+        ClearSession();
         return View();
-    }
-
-    private bool ValidateToken()
-    {
-        var token = HttpContext.Session.GetString("Token");
-        if (string.IsNullOrWhiteSpace(token))
-            return false;
-
-        var handler = new JwtSecurityTokenHandler();
-
-        try
-        {
-            var jwtToken = handler.ReadJwtToken(token);
-            return jwtToken.ValidTo > DateTime.UtcNow;
-        }
-        catch (Exception ex)
-        {
-            return false;
-        }
-    }
-
-    private void ClearSession()
-    {
-        HttpContext.Session.Remove("Token");
-        HttpContext.Session.Remove("User");
     }
 
     [HttpPost]
     public async Task<IActionResult> ValidateLogin([FromForm] LoginRequest login)
     {
-        if (ModelState.IsValid)
+        if (!ModelState.IsValid)
         {
-            var handler = new HttpClientHandler()
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            };
-
-            var client = new HttpClient(handler);
-
-            var content = new StringContent(JsonSerializer.Serialize(login), Encoding.UTF8, "application/json");
-            var response = await client.PostAsync("https://45.187.55.245:7195/api/v1/auth/login", content);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                var tokenResponse = JsonSerializer.Deserialize<AuthResponse>(jsonResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                HttpContext.Session.SetString("Token", tokenResponse.Token);
-                HttpContext.Session.SetString("RefreshToken", tokenResponse.RefreshToken);
-                HttpContext.Session.SetString("User", login.Email);
-
-                return RedirectToAction("Dashboard", "Dashboard");
-            }
-            else
-            {
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
-                {
-                    ViewBag.ErrorMessage = "Email ou senha invalidos.";
-                }
-                else
-                {
-                    ViewBag.ErrorMessage = $"Nao foi possivel fazer login, erro {response.StatusCode}";
-                }
-            }
+            ViewBag.ErrorMessage = "Usuário ou senha inválidos.";
+            return View("Login");
         }
 
-        ViewBag.ErrorMessage = "Usuário ou senha inválidos!";
-        return View("Login");
+        // cria client que ignora SSL (p/ ambiente interno/self-signed)
+        var client = CreateUnsafeClient();
+
+        var content = new StringContent(JsonSerializer.Serialize(login), Encoding.UTF8, "application/json");
+        var response = await client.PostAsync($"{ApiBaseUrl}/login", content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+                ViewBag.ErrorMessage = "Email ou senha inválidos.";
+            else
+                ViewBag.ErrorMessage = $"Não foi possível fazer login. Erro {response.StatusCode}";
+
+            return View("Login");
+        }
+
+        // login ok
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        var tokenResponse = JsonSerializer.Deserialize<AuthResponse>(jsonResponse,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        SaveSession(tokenResponse);
+
+        return RedirectToAction("Dashboard", "Dashboard");
     }
+
+    [HttpPost]
     public async Task<IActionResult> Logout()
     {
-        await RevokeToken();
-        RemoveSession();
+        await RevokeTokenAsync();
+        ClearSession();
         return RedirectToAction("Login", "Account");
     }
 
-    private void RemoveSession()
+    private HttpClient CreateUnsafeClient()
     {
-        HttpContext.Session.Remove("Token");
-        HttpContext.Session.Remove("User");
+        var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+        return new HttpClient(handler);
     }
 
-    private async Task RevokeToken()
+    private void SaveSession(AuthResponse auth)
+    {
+        HttpContext.Session.SetString("Token", auth.Token);
+        HttpContext.Session.SetString("RefreshToken", auth.RefreshToken);
+        HttpContext.Session.SetString("User", auth.UserEmail ?? "");
+        HttpContext.Session.SetString("TokenExpireUtc", auth.ExpirationUtc.ToString("o")); 
+    }
+
+    private void ClearSession()
+    {
+        HttpContext.Session.Remove("Token");
+        HttpContext.Session.Remove("RefreshToken");
+        HttpContext.Session.Remove("User");
+        HttpContext.Session.Remove("TokenExpireUtc");
+    }
+
+    private async Task<bool> HasValidOrRefreshedTokenAsync()
     {
         var token = HttpContext.Session.GetString("Token");
-        if (!string.IsNullOrEmpty(token))
-        {
-            var handler = new HttpClientHandler()
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            };
+        var refreshToken = HttpContext.Session.GetString("RefreshToken");
+        var expiresStr = HttpContext.Session.GetString("TokenExpireUtc");
 
-            var client = new HttpClient(handler);
-            var response = await client.PostAsync("https://45.187.55.245:7195/api/v1/auth/revoke-token", null);
+        if (string.IsNullOrWhiteSpace(token) ||
+            string.IsNullOrWhiteSpace(refreshToken) ||
+            string.IsNullOrWhiteSpace(expiresStr))
+            return false;
+
+        if (!DateTime.TryParse(expiresStr, out var expireUtc))
+            return false;
+
+        if (expireUtc > DateTime.UtcNow.AddSeconds(30))
+            return true;
+
+        var client = CreateUnsafeClient();
+        var refreshPayload = new RefreshTokenRequest
+        {
+            Token = token,
+            RefreshToken = refreshToken
+        };
+
+        var content = new StringContent(JsonSerializer.Serialize(refreshPayload), Encoding.UTF8, "application/json");
+        var response = await client.PostAsync($"{ApiBaseUrl}/refresh-token", content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return false;
+        }
+
+        var jsonResponse = await response.Content.ReadAsStringAsync();
+        var tokenResponse = JsonSerializer.Deserialize<AuthResponse>(jsonResponse,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        SaveSession(tokenResponse);
+        return true;
+    }
+
+    private async Task RevokeTokenAsync()
+    {
+        var token = HttpContext.Session.GetString("Token");
+        if (string.IsNullOrWhiteSpace(token))
+            return;
+
+        var client = CreateUnsafeClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        try
+        {
+            await client.PostAsync($"{ApiBaseUrl}/revoke-token", null);
+        }
+        catch
+        {
+
         }
     }
 }
